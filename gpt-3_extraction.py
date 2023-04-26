@@ -1,3 +1,12 @@
+import os
+import openai
+
+import tiktoken
+
+# Load your API key from an environment variable or secret management service
+# openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = "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"
+
 """
 Generate samples with GPT-2 and filter out those that are likely to be
 memorized samples from the training set.
@@ -12,23 +21,19 @@ from pprint import pprint
 import sys
 import torch
 import zlib
-from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from tqdm import tqdm
 import os
+import math
 os.environ['TRANSFORMERS_CACHE'] = '/scratch/gpfs/blou/.cache/'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def calculatePerplexity(sentence, model, tokenizer):
-    """
-    exp(loss)
-    """
-    input_ids = torch.tensor(tokenizer.encode(sentence)).unsqueeze(0)
-    input_ids = input_ids.to(device)
-    with torch.no_grad():
-        outputs = model(input_ids, labels=input_ids)
-    loss, logits = outputs[:2]
-    return torch.exp(loss)
+def calculate_perplexity(probs):
+    log_perplexity = sum(-math.log2(p) for p in probs) / len(probs)
+    perplexity = math.pow(2, log_perplexity)
+    return perplexity
+
+
 
 def print_best(metric, samples, name1, scores1, name2=None, scores2=None, n=10):
     """
@@ -87,16 +92,18 @@ def main():
     # sample from the top_k tokens output by the model
     top_k = 40
 
-    print("Loading GPT2...")
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2', cache_dir="/scratch/gpfs/blou/.cache/")
-    tokenizer.padding_side = "left" 
-    tokenizer.pad_token = tokenizer.eos_token
+    # print("Loading GPT2...")
+    
+    # tokenizer = GPT2Tokenizer.from_pretrained('gpt2', cache_dir="/scratch/gpfs/blou/.cache/")
+    # tokenizer.padding_side = "left" 
+    # tokenizer.pad_token = tokenizer.eos_token
+    tokenizer = tiktoken.get_encoding("cl100k_base")
 
-    model1 = GPT2LMHeadModel.from_pretrained('gpt2-xl', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
-    model1.config.pad_token_id = model1.config.eos_token_id
-    model2 = GPT2LMHeadModel.from_pretrained('gpt2', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
-    model1.eval()
-    model2.eval()
+    # model1 = GPT2LMHeadModel.from_pretrained('gpt2-xl', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
+    # model1.config.pad_token_id = model1.config.eos_token_id
+    # model2 = GPT2LMHeadModel.from_pretrained('gpt2', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
+    # model1.eval()
+    # model2.eval()
     
     samples = []
     scores = {"XL": [], "S": [], "Lower": [], "zlib": []}
@@ -111,47 +118,57 @@ def main():
                 input_len = 10
                 input_ids = []
                 attention_mask = []
-
+                prompts = []
                 while len(input_ids) < args.batch_size:
                     # take some random words in common crawl
                     r = np.random.randint(0, len(cc))
                     prompt = " ".join(cc[r:r+100].split(" ")[1:-1])
 
                     # make sure we get the same number of tokens for each prompt to enable batching
-                    inputs = tokenizer(prompt, return_tensors="pt", max_length=input_len, truncation=True)
-                    if len(inputs['input_ids'][0]) == input_len:
-                        input_ids.append(inputs['input_ids'][0])
-                        attention_mask.append(inputs['attention_mask'][0])
+                    # inputs = tokenizer(prompt, return_tensors="pt", max_length=input_len, truncation=True)
+                    inputs = tokenizer.encode(prompt)[:input_len]
+                    if len(inputs) == input_len:
+                        input_ids.append(inputs)
+                        # attention_mask.append(inputs['attention_mask'][0])
+                        prompts.append(tokenizer.decode(inputs))
 
-                inputs = {'input_ids': torch.stack(input_ids), 
-                          'attention_mask': torch.stack(attention_mask)}
+                # inputs = {'input_ids': torch.stack(input_ids), 
+                #           'attention_mask': torch.stack(attention_mask)}
 
                 # the actual truncated prompts
-                prompts = tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)
+                # prompts = tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)
+                
             else:
                 prompts = ["<|endoftext|>"] * args.batch_size
                 input_len = 1
                 inputs = tokenizer(prompts, return_tensors="pt", padding=True)
 
             # batch generation
-            output_sequences = model1.generate(
-                input_ids=inputs['input_ids'].to(device),
-                attention_mask=inputs['attention_mask'].to(device),
-                max_length=input_len + seq_len,
-                do_sample=True, 
-                top_k=top_k, 
-                top_p=1.0
-            )
+            # output_sequences = model1.generate(
+            #     input_ids=inputs['input_ids'].to(device),
+            #     attention_mask=inputs['attention_mask'].to(device),
+            #     max_length=input_len + seq_len,
+            #     do_sample=True, 
+            #     top_k=top_k, 
+            #     top_p=1.0
+            # )
+            # texts = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
+            texts = openai.Completion.create(model="text-davinci-003", 
+                                             prompt=prompts, 
+                                             max_tokens=input_len + seq_len,
+                                             top_p=1.0,
+                                             logprobs=1,
+                                             )
 
-            texts = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
-
-            for text in texts:
+            for text in texts.choices:
                 # perplexity of GPT2-XL and GPT2-S
-                p1 = calculatePerplexity(text, model1, tokenizer)
-                p2 = calculatePerplexity(text, model2, tokenizer)
+                logprobs = text.logprobs.top_logprobs
+                probs = [math.exp(logprob[token]) for logprob, token in zip(logprobs, tokens)]
+                p1 = calculate_perplexity(probs)
+                p2 = calculate_perplexity(probs)
 
                 # perplexity on lower-case sample
-                p_lower = calculatePerplexity(text.lower(), model1, tokenizer)
+                p_lower = calculate_perplexity(text.lower())
 
                 # Zlib "entropy" of sample
                 zlib_entropy = len(zlib.compress(bytes(text, 'utf-8')))
