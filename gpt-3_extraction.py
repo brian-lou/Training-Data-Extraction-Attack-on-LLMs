@@ -6,6 +6,7 @@ import tiktoken
 # Load your API key from an environment variable or secret management service
 # openai.api_key = os.getenv("OPENAI_API_KEY")
 openai.api_key = "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"
+gpt_model = "text-davinci-003"
 
 """
 Generate samples with GPT-2 and filter out those that are likely to be
@@ -25,13 +26,14 @@ from tqdm import tqdm
 import os
 import math
 os.environ['TRANSFORMERS_CACHE'] = '/scratch/gpfs/blou/.cache/'
-
+os.environ['TIKTOKEN_CACHE_DIR'] = "/scratch/gpfs/blou/tmp/"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def calculate_perplexity(probs):
-    log_perplexity = sum(-math.log2(p) for p in probs) / len(probs)
-    perplexity = math.pow(2, log_perplexity)
-    return perplexity
+def calculate_perplexity(token_logprobs):
+    num_tokens = len(token_logprobs)
+    log_prob_sum = sum(token_logprobs)
+    avg_log_prob = log_prob_sum / num_tokens
+    return np.exp(-avg_log_prob)
 
 
 
@@ -97,7 +99,7 @@ def main():
     # tokenizer = GPT2Tokenizer.from_pretrained('gpt2', cache_dir="/scratch/gpfs/blou/.cache/")
     # tokenizer.padding_side = "left" 
     # tokenizer.pad_token = tokenizer.eos_token
-    tokenizer = tiktoken.get_encoding("cl100k_base")
+    tokenizer = tiktoken.encoding_for_model(gpt_model)
 
     # model1 = GPT2LMHeadModel.from_pretrained('gpt2-xl', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
     # model1.config.pad_token_id = model1.config.eos_token_id
@@ -106,7 +108,7 @@ def main():
     # model2.eval()
     
     samples = []
-    scores = {"XL": [], "S": [], "Lower": [], "zlib": []}
+    scores = {"GPT3": [], "zlib": []}
 
     num_batches = int(np.ceil(args.N / args.batch_size))
     with tqdm(total=args.N) as pbar:
@@ -130,7 +132,7 @@ def main():
                     if len(inputs) == input_len:
                         input_ids.append(inputs)
                         # attention_mask.append(inputs['attention_mask'][0])
-                        prompts.append(tokenizer.decode(inputs))
+                        prompts.append(inputs)
 
                 # inputs = {'input_ids': torch.stack(input_ids), 
                 #           'attention_mask': torch.stack(attention_mask)}
@@ -139,9 +141,10 @@ def main():
                 # prompts = tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)
                 
             else:
-                prompts = ["<|endoftext|>"] * args.batch_size
+                # prompts = ["<|endoftext|>"] * args.batch_size
                 input_len = 1
-                inputs = tokenizer(prompts, return_tensors="pt", padding=True)
+                # inputs = tokenizer(prompts, return_tensors="pt", padding=True)
+                prompts = [tokenizer.encode("<|endoftext|>", allowed_special={'<|endoftext|>'}) for i in range(args.batch_size)]
 
             # batch generation
             # output_sequences = model1.generate(
@@ -153,64 +156,62 @@ def main():
             #     top_p=1.0
             # )
             # texts = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
-            texts = openai.Completion.create(model="text-davinci-003", 
+            texts = openai.Completion.create(model=gpt_model, 
                                              prompt=prompts, 
                                              max_tokens=input_len + seq_len,
                                              top_p=1.0,
                                              logprobs=1,
                                              )
 
-            for text in texts.choices:
-                # perplexity of GPT2-XL and GPT2-S
-                logprobs = text.logprobs.top_logprobs
-                probs = [math.exp(logprob[token]) for logprob, token in zip(logprobs, tokens)]
-                p1 = calculate_perplexity(probs)
-                p2 = calculate_perplexity(probs)
+
+            for choice in texts.choices:
+                text = choice.text
+                
+                p1 = calculate_perplexity(choice['logprobs']['token_logprobs'])
 
                 # perplexity on lower-case sample
-                p_lower = calculate_perplexity(text.lower())
+                # p_lower = calculate_perplexity(text.lower(), choice, tokenizer)
 
                 # Zlib "entropy" of sample
                 zlib_entropy = len(zlib.compress(bytes(text, 'utf-8')))
 
                 samples.append(text)
-                scores["XL"].append(p1.cpu())
-                scores["S"].append(p2.cpu())
-                scores["Lower"].append(p_lower.cpu())
+                scores["GPT3"].append(p1)
+                # scores["Lower"].append(p_lower.cpu())
                 scores["zlib"].append(zlib_entropy)
 
             pbar.update(args.batch_size)
 
-    scores["XL"] = np.asarray(scores["XL"])
-    scores["S"] = np.asarray(scores["S"])
-    scores["Lower"] = np.asarray(scores["Lower"])
+    scores["GPT3"] = np.asarray(scores["GPT3"])
+    # scores["S"] = np.asarray(scores["S"])
+    # scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
     # Sort by perplexity
-    metric = -np.log(scores["XL"])
-    print(f"======== top sample by XL perplexity: ========")
-    print_best(metric, samples, "PPL", scores["XL"])
+    metric = -np.log(scores["GPT3"])
+    print(f"======== top sample by GPT3 perplexity: ========")
+    print_best(metric, samples, "PPL", scores["GPT3"])
     print()
     print()
 
-    # Sort by ratio of log perplexities of S and XL models
-    metric = np.log(scores["S"]) / np.log(scores["XL"])
-    print(f"======== top sample by ratio of S and XL perplexities: ========")
-    print_best(metric, samples, "PPL-XL", scores["XL"], "PPL-S", scores["S"])
-    print()
-    print()
+    # Sort by ratio of log perplexities of S and GPT3 models
+    # metric = np.log(scores["S"]) / np.log(scores["GPT3"])
+    # print(f"======== top sample by ratio of S and GPT3 perplexities: ========")
+    # print_best(metric, samples, "PPL-GPT3", scores["GPT3"], "PPL-S", scores["S"])
+    # print()
+    # print()
 
     # Sort by ratio of log perplexities of lower-case and normal-case perplexities 
-    metric = np.log(scores["Lower"]) / np.log(scores["XL"])
-    print(f"======== top sample by ratio of lower-case and normal-case perplexities: ========")
-    print_best(metric, samples, "PPL-XL", scores["XL"], "PPL-XL-Lower", scores["Lower"])
-    print()
-    print()
+    # metric = np.log(scores["Lower"]) / np.log(scores["GPT3"])
+    # print(f"======== top sample by ratio of lower-case and normal-case perplexities: ========")
+    # print_best(metric, samples, "PPL-GPT3", scores["GPT3"], "PPL-GPT3-Lower", scores["Lower"])
+    # print()
+    # print()
 
-    # Sort by ratio of Zlib entropy and XL perplexity
-    metric = scores["zlib"] / np.log(scores["XL"])
-    print(f"======== top sample by ratio of Zlib entropy and XL perplexity: ========")
-    print_best(metric, samples, "PPL-XL", scores["XL"], "Zlib", scores["zlib"])
+    # Sort by ratio of Zlib entropy and GPT3 perplexity
+    metric = scores["zlib"] / np.log(scores["GPT3"])
+    print(f"======== top sample by ratio of Zlib entropy and GPT3 perplexity: ========")
+    print_best(metric, samples, "PPL-GPT3", scores["GPT3"], "Zlib", scores["zlib"])
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
