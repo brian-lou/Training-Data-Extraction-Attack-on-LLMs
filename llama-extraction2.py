@@ -12,8 +12,7 @@ from pprint import pprint
 import sys
 import torch
 import zlib
-from transformers import GPT2Tokenizer, GPT2LMHeadModel
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import LlamaForCausalLM, LlamaTokenizer
 from tqdm import tqdm
 import os
 import utils
@@ -95,22 +94,26 @@ def main():
     # sample from the top_k tokens output by the model
     top_k = 40
 
-    print("Loading GPT2-IMDB...")
+    print("Loading LlaMa...")
+    
+    tokenizer = LlamaTokenizer.from_pretrained("/scratch/gpfs/blou/.llamahugging")
+    model1 = LlamaForCausalLM.from_pretrained("/scratch/gpfs/blou/.llamahugging").cuda()
     # tokenizer = GPT2Tokenizer.from_pretrained('gpt2', cache_dir="/scratch/gpfs/blou/.cache/")
-    tokenizer = AutoTokenizer.from_pretrained("lvwerra/gpt2-imdb", cache_dir="/scratch/gpfs/blou/.cache/", padding_side = "left" )
+    # tokenizer = AutoTokenizer.from_pretrained("lvwerra/LlaMa", cache_dir="/scratch/gpfs/blou/.cache/", padding_side = "left" )
     tokenizer.padding_side = "left" 
     tokenizer.pad_token = tokenizer.eos_token
 
-    # model1 = GPT2LMHeadModel.from_pretrained('gpt2-GPT2-IMDB', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
-    model1 = AutoModelForCausalLM.from_pretrained("lvwerra/gpt2-imdb", return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
+    # model1 = GPT2LMHeadModel.from_pretrained('gpt2-LlaMa', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
+    # model1 = AutoModelForCausalLM.from_pretrained("lvwerra/LlaMa", return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
     
+
     model1.config.pad_token_id = model1.config.eos_token_id
     # model2 = GPT2LMHeadModel.from_pretrained('gpt2', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
     model1.eval()
     # model2.eval()
     
     samples = []
-    scores = {"GPT2-IMDB": [], "zlib": []}
+    scores = {"LlaMa": [], "zlib": []}
 
     num_batches = int(np.ceil(args.N / args.batch_size))
     with tqdm(total=args.N) as pbar:
@@ -140,9 +143,9 @@ def main():
                 # the actual truncated prompts
                 prompts = tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)
             else:
-                prompts = ["<|endoftext|>"] * args.batch_size
+                prompts = ["<s>"] * args.batch_size
                 input_len = 1
-                inputs = tokenizer(prompts, return_tensors="pt", padding=True)
+                inputs = tokenizer(prompts, return_tensors="pt", padding=True).input_ids.to(device)
 
             # batch generation
             output_sequences = model1.generate(
@@ -158,7 +161,7 @@ def main():
             for text in texts:
                 if len(text) <= 2:
                     continue
-                # perplexity of GPT2-GPT2-IMDB and GPT2-S
+                # perplexity of GPT2-LlaMa and GPT2-S
                 p1 = calculatePerplexity(text, model1, tokenizer)
                 # p2 = calculatePerplexity(text, model2, tokenizer)
 
@@ -169,51 +172,54 @@ def main():
                 zlib_entropy = len(zlib.compress(bytes(text, 'utf-8')))
 
                 samples.append(text)
-                scores["GPT2-IMDB"].append(p1.cpu())
+                scores["LlaMa"].append(p1.cpu())
                 # scores["S"].append(p2.cpu())
                 # scores["Lower"].append(p_lower.cpu())
                 scores["zlib"].append(zlib_entropy)
 
             pbar.update(args.batch_size)
 
-    scores["GPT2-IMDB"] = np.asarray(scores["GPT2-IMDB"])
+    scores["LlaMa"] = np.asarray(scores["LlaMa"])
     # scores["S"] = np.asarray(scores["S"])
     # scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
-    f = open("gpt-2-imdb_perp.txt", 'w+', encoding="utf-8")
+    f = open("llama-samples-perp.txt", 'w+', encoding="utf-8")
         
     # Sort by perplexity
-    metric = -np.log(scores["GPT2-IMDB"])
-    print(f"======== top sample by GPT2-IMDB perplexity: ========")
-    print_best(metric, samples, "PPL", scores["GPT2-IMDB"])
-    utils.print_best_tofile(metric, samples, "PPL", scores["GPT2-IMDB"], f, n=1000)
+    metric = -np.log(scores["LlaMa"])
+    print(f"======== top sample by LlaMa perplexity: ========")
+    print_best(metric, samples, "PPL", scores["LlaMa"])
+    utils.print_best_tofile(metric, samples, "PPL", scores["LlaMa"], f, n=1000)
     f.close()
     print()
     print()
 
-    # Sort by ratio of log perplexities of S and GPT2-IMDB models
-    # metric = np.log(scores["S"]) / np.log(scores["GPT2-IMDB"])
-    # print(f"======== top sample by ratio of S and GPT2-IMDB perplexities: ========")
-    # print_best(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], "PPL-S", scores["S"])
+    # Sort by ratio of log perplexities of S and LlaMa models
+    # metric = np.log(scores["S"]) / np.log(scores["LlaMa"])
+    # print(f"======== top sample by ratio of S and LlaMa perplexities: ========")
+    # print_best(metric, samples, "PPL-LlaMa", scores["LlaMa"], "PPL-S", scores["S"])
     # print()
     # print()
 
     # Sort by ratio of log perplexities of lower-case and normal-case perplexities 
-    # metric = np.log(scores["Lower"]) / np.log(scores["GPT2-IMDB"])
+    # f = open("llama-samples-perp.txt", 'w+', encoding="utf-8")
+    # metric = np.log(scores["Lower"]) / np.log(scores["LlaMa"])
     # print(f"======== top sample by ratio of lower-case and normal-case perplexities: ========")
-    # print_best(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], "PPL-GPT2-IMDB-Lower", scores["Lower"])
+    # print_best(metric, samples, "PPL-LlaMa", scores["LlaMa"], "PPL-LlaMa-Lower", scores["Lower"])
+    # utils.print_best_tofile(metric, samples, "PPL-LlaMa", scores["LlaMa"], f, n=1000)
+    # f.close()
     # print()
     # print()
 
-    # Sort by ratio of Zlib entropy and GPT2-IMDB perplexity
-    f = open("gpt-2-imdb_zlib.txt", 'w+', encoding="utf-8")
-    metric = scores["zlib"] / np.log(scores["GPT2-IMDB"])
-    print(f"======== top sample by ratio of Zlib entropy and GPT2-IMDB perplexity: ========")
-    print_best(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], "Zlib", scores["zlib"])
-    utils.print_best_tofile(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], f, n=1000)
-
+    # Sort by ratio of Zlib entropy and LlaMa perplexity
+    f = open("llama-samples-zlib.txt", 'w+', encoding="utf-8")
+    metric = scores["zlib"] / np.log(scores["LlaMa"])
+    print(f"======== top sample by ratio of Zlib entropy and LlaMa perplexity: ========")
+    print_best(metric, samples, "PPL-LlaMa", scores["LlaMa"], "Zlib", scores["zlib"])
+    utils.print_best_tofile(metric, samples, "PPL-LlaMa", scores["LlaMa"], f, n=1000)
     f.close()
+
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--N', type=int, default=1000, help="Number of samples to generate")

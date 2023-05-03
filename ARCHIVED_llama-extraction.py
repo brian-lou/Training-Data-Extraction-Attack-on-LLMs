@@ -12,11 +12,11 @@ from pprint import pprint
 import sys
 import torch
 import zlib
-from transformers import GPT2Tokenizer, GPT2LMHeadModel
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from llama import ModelArgs, Transformer, Tokenizer, LLaMA
 from tqdm import tqdm
 import os
 import utils
+from llama_main import llama_init
 os.environ['TRANSFORMERS_CACHE'] = '/scratch/gpfs/blou/.cache/'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -25,13 +25,8 @@ def calculatePerplexity(sentence, model, tokenizer):
     """
     exp(loss)
     """
-    # print(f"Sentence: {sentence}")
-    tmp = tokenizer.encode(sentence)
-    # print(f"Tokens: {tmp}")
-    input_ids = torch.tensor(tmp).unsqueeze(0)
-    # print(input_ids)
+    input_ids = torch.tensor(tokenizer.encode(sentence)).unsqueeze(0)
     input_ids = input_ids.to(device)
-    # print(input_ids)
     with torch.no_grad():
         outputs = model(input_ids, labels=input_ids)
     loss, logits = outputs[:2]
@@ -55,7 +50,6 @@ def print_best(metric, samples, name1, scores1, name2=None, scores2=None, n=10):
         pprint(samples[idx])
         print()
         print()
-
         
 
 def parse_commoncrawl(wet_file):
@@ -95,22 +89,21 @@ def main():
     # sample from the top_k tokens output by the model
     top_k = 40
 
-    print("Loading GPT2-IMDB...")
+    # print("Loading GPT2...")
     # tokenizer = GPT2Tokenizer.from_pretrained('gpt2', cache_dir="/scratch/gpfs/blou/.cache/")
-    tokenizer = AutoTokenizer.from_pretrained("lvwerra/gpt2-imdb", cache_dir="/scratch/gpfs/blou/.cache/", padding_side = "left" )
-    tokenizer.padding_side = "left" 
-    tokenizer.pad_token = tokenizer.eos_token
+    # tokenizer.padding_side = "left" 
+    # tokenizer.pad_token = tokenizer.eos_token
 
-    # model1 = GPT2LMHeadModel.from_pretrained('gpt2-GPT2-IMDB', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
-    model1 = AutoModelForCausalLM.from_pretrained("lvwerra/gpt2-imdb", return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
-    
-    model1.config.pad_token_id = model1.config.eos_token_id
+    # model1 = GPT2LMHeadModel.from_pretrained('gpt2-xl', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
+    # model1.config.pad_token_id = model1.config.eos_token_id
     # model2 = GPT2LMHeadModel.from_pretrained('gpt2', return_dict=True, cache_dir="/scratch/gpfs/blou/.cache/").to(device)
-    model1.eval()
+    # model1.eval()
     # model2.eval()
+    model1, tokenizer = llama_init.init_llama()
+    
     
     samples = []
-    scores = {"GPT2-IMDB": [], "zlib": []}
+    scores = {"LlaMa": [], "S": [], "Lower": [], "zlib": []}
 
     num_batches = int(np.ceil(args.N / args.batch_size))
     with tqdm(total=args.N) as pbar:
@@ -121,7 +114,7 @@ def main():
 
                 input_len = 10
                 input_ids = []
-                attention_mask = []
+                prompts = []
 
                 while len(input_ids) < args.batch_size:
                     # take some random words in common crawl
@@ -129,98 +122,90 @@ def main():
                     prompt = " ".join(cc[r:r+100].split(" ")[1:-1])
 
                     # make sure we get the same number of tokens for each prompt to enable batching
-                    inputs = tokenizer(prompt, return_tensors="pt", max_length=input_len, truncation=True)
-                    if len(inputs['input_ids'][0]) == input_len:
-                        input_ids.append(inputs['input_ids'][0])
-                        attention_mask.append(inputs['attention_mask'][0])
-
-                inputs = {'input_ids': torch.stack(input_ids), 
-                          'attention_mask': torch.stack(attention_mask)}
-
+                    # inputs = Tokenizer(prompt, return_tensors="pt", max_length=input_len, truncation=True)
+                    inputs = tokenizer.encode(prompt, bos=True, eos=False) 
+                    # if len(inputs['input_ids'][0]) == input_len:
+                    #     input_ids.append(inputs['input_ids'][0])
+                    #     attention_mask.append(inputs['attention_mask'][0])
+                    inputs = inputs[:input_len]
+                    input_ids.append(inputs)
+                    prompts.append(tokenizer.decode(inputs))
+                    
                 # the actual truncated prompts
-                prompts = tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)
+                # prompts = tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)
             else:
                 prompts = ["<|endoftext|>"] * args.batch_size
                 input_len = 1
-                inputs = tokenizer(prompts, return_tensors="pt", padding=True)
-
+                # inputs = tokenizer(prompts, return_tensors="pt", padding=True)
+                input_ids = [tokenizer.encode(x, bos=True, eos=False) for x in prompts]
+                
             # batch generation
-            output_sequences = model1.generate(
-                input_ids=inputs['input_ids'].to(device),
-                attention_mask=inputs['attention_mask'].to(device),
-                max_length=input_len + seq_len,
-                do_sample=True, 
-                top_k=top_k, 
-                top_p=1.0
+            # output_sequences = model1.generate(
+            #     input_ids=input_ids.to(device),
+            #     attention_mask=inputs['attention_mask'].to(device),
+            #     max_length=input_len + seq_len,
+            #     do_sample=True, 
+            #     top_k=top_k, 
+            #     top_p=1.0
+            # )
+            texts, perplexities = model1.generate(
+                input_ids, max_gen_len=input_len + seq_len, temperature=0.8, top_p=0.95
             )
 
-            texts = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
-            for text in texts:
-                if len(text) <= 2:
-                    continue
-                # perplexity of GPT2-GPT2-IMDB and GPT2-S
-                p1 = calculatePerplexity(text, model1, tokenizer)
-                # p2 = calculatePerplexity(text, model2, tokenizer)
+            # texts = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
 
-                # perplexity on lower-case sample
-                # p_lower = calculatePerplexity(text.lower(), model1, tokenizer)
-
+            for text, ppl in zip(texts, perplexities):
                 # Zlib "entropy" of sample
                 zlib_entropy = len(zlib.compress(bytes(text, 'utf-8')))
 
                 samples.append(text)
-                scores["GPT2-IMDB"].append(p1.cpu())
-                # scores["S"].append(p2.cpu())
-                # scores["Lower"].append(p_lower.cpu())
+                scores["LlaMa"].append(ppl)
                 scores["zlib"].append(zlib_entropy)
 
             pbar.update(args.batch_size)
 
-    scores["GPT2-IMDB"] = np.asarray(scores["GPT2-IMDB"])
-    # scores["S"] = np.asarray(scores["S"])
-    # scores["Lower"] = np.asarray(scores["Lower"])
+    scores["LlaMa"] = np.asarray(scores["LlaMa"])
+    scores["S"] = np.asarray(scores["S"])
+    scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
-    f = open("gpt-2-imdb_perp.txt", 'w+', encoding="utf-8")
-        
+    f = open("gpt-2-xl.txt", 'w+', encoding="utf-8")
     # Sort by perplexity
-    metric = -np.log(scores["GPT2-IMDB"])
-    print(f"======== top sample by GPT2-IMDB perplexity: ========")
-    print_best(metric, samples, "PPL", scores["GPT2-IMDB"])
-    utils.print_best_tofile(metric, samples, "PPL", scores["GPT2-IMDB"], f, n=1000)
+    metric = -np.log(scores["LlaMa"])
+    print(f"======== top sample by XL perplexity: ========")
+    print_best(metric, samples, "PPL", scores["LlaMa"])
+    utils.print_best_tofile(metric, samples, "PPL", scores["LlaMa"], f)
     f.close()
     print()
     print()
 
-    # Sort by ratio of log perplexities of S and GPT2-IMDB models
-    # metric = np.log(scores["S"]) / np.log(scores["GPT2-IMDB"])
-    # print(f"======== top sample by ratio of S and GPT2-IMDB perplexities: ========")
-    # print_best(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], "PPL-S", scores["S"])
-    # print()
-    # print()
+    # Sort by ratio of log perplexities of S and XL models
+    metric = np.log(scores["S"]) / np.log(scores["LlaMa"])
+    print(f"======== top sample by ratio of S and XL perplexities: ========")
+    print_best(metric, samples, "PPL-XL", scores["LlaMa"], "PPL-S", scores["S"])
+    print()
+    print()
 
     # Sort by ratio of log perplexities of lower-case and normal-case perplexities 
-    # metric = np.log(scores["Lower"]) / np.log(scores["GPT2-IMDB"])
-    # print(f"======== top sample by ratio of lower-case and normal-case perplexities: ========")
-    # print_best(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], "PPL-GPT2-IMDB-Lower", scores["Lower"])
-    # print()
-    # print()
+    metric = np.log(scores["Lower"]) / np.log(scores["LlaMa"])
+    print(f"======== top sample by ratio of lower-case and normal-case perplexities: ========")
+    print_best(metric, samples, "PPL-XL", scores["LlaMa"], "PPL-XL-Lower", scores["Lower"])
+    print()
+    print()
 
-    # Sort by ratio of Zlib entropy and GPT2-IMDB perplexity
-    f = open("gpt-2-imdb_zlib.txt", 'w+', encoding="utf-8")
-    metric = scores["zlib"] / np.log(scores["GPT2-IMDB"])
-    print(f"======== top sample by ratio of Zlib entropy and GPT2-IMDB perplexity: ========")
-    print_best(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], "Zlib", scores["zlib"])
-    utils.print_best_tofile(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], f, n=1000)
+    # Sort by ratio of Zlib entropy and XL perplexity
+    metric = scores["zlib"] / np.log(scores["LlaMa"])
+    print(f"======== top sample by ratio of Zlib entropy and XL perplexity: ========")
+    print_best(metric, samples, "PPL-XL", scores["LlaMa"], "Zlib", scores["zlib"])
 
-    f.close()
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--N', type=int, default=1000, help="Number of samples to generate")
     parser.add_argument('--batch-size', type=int, default=10, help="Batch size for generation")
     parser.add_argument('--internet-sampling', action='store_true', help="condition the generation using commoncrawl")
     parser.add_argument('--wet-file', type=str, default=None, help="path to a commoncrawl WET file")
-    return parser.parse_args(argv)
+    args, unknown = parser.parse_known_args(argv)
+    return args
 
 if __name__ == '__main__':
     args = parse_arguments(sys.argv[1:])

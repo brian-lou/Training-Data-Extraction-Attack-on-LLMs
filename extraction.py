@@ -100,7 +100,7 @@ def main():
     model2.eval()
     
     samples = []
-    scores = {"XL": [], "S": [], "Lower": [], "zlib": []}
+    scores = {"XL": [], "zlib": []}
 
     num_batches = int(np.ceil(args.N / args.batch_size))
     with tqdm(total=args.N) as pbar:
@@ -159,45 +159,62 @@ def main():
 
                 samples.append(text)
                 scores["XL"].append(p1.cpu())
-                scores["S"].append(p2.cpu())
-                scores["Lower"].append(p_lower.cpu())
+                # scores["S"].append(p2.cpu())
+                # scores["Lower"].append(p_lower.cpu())
                 scores["zlib"].append(zlib_entropy)
 
             pbar.update(args.batch_size)
 
     scores["XL"] = np.asarray(scores["XL"])
-    scores["S"] = np.asarray(scores["S"])
-    scores["Lower"] = np.asarray(scores["Lower"])
+    # scores["S"] = np.asarray(scores["S"])
+    # scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
-    f = open("gpt-2-xl.txt", 'w+', encoding="utf-8")
+    f = open("gpt-2-xl_perp.txt", 'w+', encoding="utf-8")
     # Sort by perplexity
     metric = -np.log(scores["XL"])
     print(f"======== top sample by XL perplexity: ========")
     print_best(metric, samples, "PPL", scores["XL"])
-    utils.print_best_tofile(metric, samples, "PPL", scores["XL"], f)
+    utils.print_best_tofile(metric, samples, "PPL", scores["XL"], f, n=1000)
     f.close()
     print()
     print()
+    
+    # f = open("gpt-2-s_perp.txt", 'w+', encoding="utf-8")
+    # # Sort by perplexity
+    # metric = -np.log(scores["S"])
+    # print(f"======== top sample by S perplexity: ========")
+    # print_best(metric, samples, "PPL", scores["S"])
+    # utils.print_best_tofile(metric, samples, "PPL", scores["S"], f, n=1000)
+    # f.close()
+    # print()
+    # print()
+    
 
-    # Sort by ratio of log perplexities of S and XL models
-    metric = np.log(scores["S"]) / np.log(scores["XL"])
-    print(f"======== top sample by ratio of S and XL perplexities: ========")
-    print_best(metric, samples, "PPL-XL", scores["XL"], "PPL-S", scores["S"])
-    print()
-    print()
+    # f = open("gpt-2-s-xl_metric.txt", 'w+', encoding="utf-8")
+    # # Sort by ratio of log perplexities of S and XL models
+    # metric = np.log(scores["S"]) / np.log(scores["XL"])
+    # print(f"======== top sample by ratio of S and XL perplexities: ========")
+    # print_best(metric, samples, "PPL-XL", scores["XL"], "PPL-S", scores["S"])
+    # utils.print_best_tofile(metric, samples, "PPL-XL", scores["XL"], f, n=1000)
+    # f.close()
+    # print()
+    # print()
 
     # Sort by ratio of log perplexities of lower-case and normal-case perplexities 
-    metric = np.log(scores["Lower"]) / np.log(scores["XL"])
-    print(f"======== top sample by ratio of lower-case and normal-case perplexities: ========")
-    print_best(metric, samples, "PPL-XL", scores["XL"], "PPL-XL-Lower", scores["Lower"])
-    print()
-    print()
+    # metric = np.log(scores["Lower"]) / np.log(scores["XL"])
+    # print(f"======== top sample by ratio of lower-case and normal-case perplexities: ========")
+    # print_best(metric, samples, "PPL-XL", scores["XL"], "PPL-XL-Lower", scores["Lower"])
+    # print()
+    # print()
 
     # Sort by ratio of Zlib entropy and XL perplexity
+    f = open("gpt-2-xl-zlib.txt", 'w+', encoding="utf-8")
     metric = scores["zlib"] / np.log(scores["XL"])
     print(f"======== top sample by ratio of Zlib entropy and XL perplexity: ========")
     print_best(metric, samples, "PPL-XL", scores["XL"], "Zlib", scores["zlib"])
+    utils.print_best_tofile(metric, samples, "PPL-XL", scores["XL"], f, n=1000)
+    f.close()
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()

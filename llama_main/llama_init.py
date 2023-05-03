@@ -60,7 +60,7 @@ def load(
 
     generator = LLaMA(model, tokenizer)
     print(f"Loaded in {time.time() - start_time:.2f} seconds")
-    return generator
+    return generator, tokenizer
 
 
 def main(
@@ -75,7 +75,7 @@ def main(
     if local_rank > 0:
         sys.stdout = open(os.devnull, "w")
 
-    generator = load(
+    generator, _= load(
         ckpt_dir, tokenizer_path, local_rank, world_size, max_seq_len, max_batch_size
     )
 
@@ -113,6 +113,29 @@ cheese =>""",
     for result in results:
         print(result)
         print("\n==================================\n")
+
+def init_llama_helper(
+    ckpt_dir: str,
+    tokenizer_path: str,
+    temperature: float = 0.8,
+    top_p: float = 0.95,
+    max_seq_len: int = 512,
+    max_batch_size: int = 32,
+):
+    local_rank, world_size = setup_model_parallel()
+    if local_rank > 0:
+        sys.stdout = open(os.devnull, "w")
+
+    generator, tokenizer = load(
+        ckpt_dir, tokenizer_path, local_rank, world_size, max_seq_len, max_batch_size
+    )
+    return generator, tokenizer
+
+def init_llama():
+    target_folder = os.environ["TARGET_FOLDER"]
+    token_path = os.path.join(target_folder, "tokenizer.model")
+    ckpt_path = os.path.join(target_folder, "7B")
+    return fire.Fire(init_llama_helper)
 
 
 if __name__ == "__main__":

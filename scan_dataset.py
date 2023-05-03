@@ -1,6 +1,7 @@
 import csv
 import difflib
 import json
+import numpy as np
 
 with open("IMDB Dataset.csv", mode='r') as f:
     dataset = list(csv.reader(f, delimiter=","))
@@ -28,13 +29,24 @@ def parse_commoncrawl(wet_file):
 
     return all_eng
 
-dataset = parse_commoncrawl("commoncrawl.warc.wet")
+# dataset = parse_commoncrawl("commoncrawl.warc.wet")
+def select_samples(ls, n=100):
+    
+    s = samples[np.random.choice(len(ls), n, replace=False)]
+    return s
 
-with open("gpt-2-imdb.txt", mode = 'r', encoding="utf-8") as s:
-    samples = s.readlines()
+with open("gpt-2-imdb2.txt", mode = 'r', encoding="utf-8") as s:
+    ls = json.load(s)
+    samples = select_samples(ls)
+    print(samples)
+    
 # print(ls)
 with open("gpt-2-xl.txt", 'r', encoding="utf-8") as s:
-    samples = json.load(s)
+    ls = json.load(s)
+    
+with open("llama-samples-perp.txt", encoding="utf-8") as s:
+    ls = json.load(s)
+    # print(ls)
 
 # Naive substring match
 # for sample in samples:

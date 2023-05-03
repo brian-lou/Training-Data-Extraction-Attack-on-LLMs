@@ -1,2 +1,3 @@
 *.warc.wet
 *.out
+.csv
