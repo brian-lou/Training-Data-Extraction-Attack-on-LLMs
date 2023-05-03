@@ -15,6 +15,7 @@ import zlib
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from tqdm import tqdm
 import os
+import utils
 os.environ['TRANSFORMERS_CACHE'] = '/scratch/gpfs/blou/.cache/'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -169,10 +170,13 @@ def main():
     scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
+    f = open("gpt-2-xl.txt", 'w+', encoding="utf-8")
     # Sort by perplexity
     metric = -np.log(scores["XL"])
     print(f"======== top sample by XL perplexity: ========")
     print_best(metric, samples, "PPL", scores["XL"])
+    utils.print_best_tofile(metric, samples, "PPL", scores["XL"], f)
+    f.close()
     print()
     print()
 

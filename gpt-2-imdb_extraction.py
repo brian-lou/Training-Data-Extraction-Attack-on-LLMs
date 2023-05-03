@@ -16,6 +16,7 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from tqdm import tqdm
 import os
+import utils
 os.environ['TRANSFORMERS_CACHE'] = '/scratch/gpfs/blou/.cache/'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -54,6 +55,7 @@ def print_best(metric, samples, name1, scores1, name2=None, scores2=None, n=10):
         pprint(samples[idx])
         print()
         print()
+
         
 
 def parse_commoncrawl(wet_file):
@@ -154,7 +156,7 @@ def main():
 
             texts = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
             for text in texts:
-                if text == "":
+                if len(text) <= 2:
                     continue
                 # perplexity of GPT2-GPT2-IMDB and GPT2-S
                 p1 = calculatePerplexity(text, model1, tokenizer)
@@ -179,10 +181,14 @@ def main():
     scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
+    f = open("gpt-2-imdb.txt", 'w+', encoding="utf-8")
+        
     # Sort by perplexity
     metric = -np.log(scores["GPT2-IMDB"])
     print(f"======== top sample by GPT2-IMDB perplexity: ========")
     print_best(metric, samples, "PPL", scores["GPT2-IMDB"])
+    utils.print_best_tofile(metric, samples, "PPL", scores["GPT2-IMDB"], f, n=1000)
+    f.close()
     print()
     print()
 
