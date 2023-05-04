@@ -22,7 +22,7 @@ def sample_elements(arr, num_samples):
     return sampled_elements
 
 # Read search terms from file
-with open("gpt-2-imdb_perp_prompt.txt", "r") as infile:
+with open("imdb_detectgpt_samples.txt", "r") as infile:
     file_content = infile.read()
     SEARCH_TERMS = sample_elements(ast.literal_eval(file_content), 100)
     # SEARCH_TERMS = ast.literal_eval(file_content)[:100]
@@ -31,7 +31,7 @@ total_search_terms = len(SEARCH_TERMS)
 successful_searches = 0
 
 # Open a text file named "results.txt" for saving search results
-with open("analysis_imdb_cdf.txt", "w", encoding="utf-8") as results_file:
+with open("analysis_imdb_detectgpt.txt", "w", encoding="utf-8") as results_file:
     for query in SEARCH_TERMS:
         url = f"https://www.googleapis.com/customsearch/v1?key={API_KEY}&cx={SEARCH_ENGINE_ID}&q=%22{query}%22"
         response = requests.get(url)
