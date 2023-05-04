@@ -1,3 +1,7 @@
+.venv/
+__pycache__
+results/
+tmp_results/
 *.warc.wet
 *.out
 .csv
