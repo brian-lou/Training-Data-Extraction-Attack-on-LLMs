@@ -9,10 +9,9 @@ args = parser.parse_args()
 with open(args.results_path) as file:
     results = json.load(file)
 
-scores = results['predictions']['real']
-samples = [result['original'] for result in results['raw_results']]
-scores_samples = sorted(zip(scores, samples))
-sorted_samples = [sample for _, sample in scores_samples]
+scores_results = [score_result for score_result in zip(results['predictions']['real'], results['raw_results']) if score_result[1]['original_ll'] > -1000]
+scores_samples = [(score, result['original']) for score, result in scores_results]
+sorted_samples = [sample for _, sample in sorted(scores_samples)]
 
 with open(args.output_path, 'w') as file:
     json.dump(sorted_samples, file)

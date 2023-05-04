@@ -16,6 +16,7 @@ import functools
 import custom_datasets
 from multiprocessing.pool import ThreadPool
 import time
+import math
 
 
 
@@ -262,6 +263,7 @@ def get_likelihood(logits, labels):
     return log_likelihood.mean()
 
 
+# MODIFIED
 # Get the log likelihood of each text under the base_model
 def get_ll(text):
     if args.openai_model:        
@@ -277,7 +279,8 @@ def get_ll(text):
         with torch.no_grad():
             tokenized = base_tokenizer(text, return_tensors="pt").to(DEVICE)
             labels = tokenized.input_ids
-            return -base_model(**tokenized, labels=labels).loss.item()
+            loss = -base_model(**tokenized, labels=labels).loss.item()
+            return -1000 if math.isnan(loss) else loss
 
 
 def get_lls(texts):
@@ -622,7 +625,7 @@ def generate_samples(raw_data, batch_size):
 
 # MODIFIED
 def generate_data(dataset, key):
-    data = custom_datasets.load(dataset, cache_dir, dataset_path=args.dataset_path)
+    data = custom_datasets.load(dataset, cache_dir, dataset_path=args.dataset_path)[:n_samples]
     return {
         'original': data,
         'sampled': data
