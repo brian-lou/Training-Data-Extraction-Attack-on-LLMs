@@ -5,11 +5,11 @@ python score.py \
     --n_samples 1000 \
     --n_perturbation_list 10 \
     --base_model_name lvwerra/gpt2-imdb \
-    --mask_filling_model_name t5-base \
+    --mask_filling_model_name t5-3b \
     --batch_size 50 \
     --output_name $results_name \
     --skip_baselines \
-    --cache_dir /home/arti/.cache \
+    --cache_dir /scratch/gpfs/blou/.cache \
     --dataset_path ../gpt-2-imdb_perp.txt
 
 python process.py \
