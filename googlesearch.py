@@ -4,17 +4,19 @@ import ast
 
 API_KEY = os.environ.get("API_KEY")
 SEARCH_ENGINE_ID = os.environ.get("SEARCH_ENGINE_ID")
+API_KEY = "AIzaSyDTWD9wDMkNqcNVmDYhe2opu3gLC0ImG0s"
+SEARCH_ENGINE_ID = "a614f84609947433d"
 
 # Read search terms from file
-with open("llama-samples-perp.txt", "r") as infile:
+with open("gpt-2-xl_perp.txt", "r") as infile:
     file_content = infile.read()
-    SEARCH_TERMS = ast.literal_eval(file_content)[:100]
+    SEARCH_TERMS = ast.literal_eval(file_content)
 
 total_search_terms = len(SEARCH_TERMS)
 successful_searches = 0
 
 # Open a text file named "results.txt" for saving search results
-with open("results_llama_first_100.txt", "w", encoding="utf-8") as results_file:
+with open("results_gpt-2-xl-all_1000_perp.txt", "w", encoding="utf-8", errors="surrogateescape") as results_file:
     for query in SEARCH_TERMS:
         url = f"https://www.googleapis.com/customsearch/v1?key={API_KEY}&cx={SEARCH_ENGINE_ID}&q=%22{query}%22"
         response = requests.get(url)
