@@ -1,19 +1,40 @@
 import requests
 import os
+import ast
 
 API_KEY = os.environ.get("API_KEY")
 SEARCH_ENGINE_ID = os.environ.get("SEARCH_ENGINE_ID")
-SEARCH_TERMS = ["Through teaching and research, we educate people who will contribute to society and develop knowledge that will make a difference in the world.", "The last time, I felt like this, in a cinema, I was six years old and I was watching Star Wars. I never imagined, I would ever find that feeling again in a cinema. That sense of being transported to another world. The opening sequence took my breath away and I never got it back. Not even at the end - which left my head spinning. It is a beautiful film with soul, wit, charm, style and love. It is simply outrageous! Bold and fantastic and fantastical. I am a straight man but my love for Ryan Gosling could change all that. He's a melancholy genius and Emma Stone is our muse. This film defies genre. It is a masterpiece. I urge you to see it. I was lucky enough to see it at the BFI London Film Festvial. It has been five days since I saw La La Land and I am still thinking about it and singing the haunting refrain that plays with your soul. I mean it gets in there - that music - the music of the firmament. Flying still, dreaming still... thank you Damien."]
 
-for query in SEARCH_TERMS:
-    url = f"https://www.googleapis.com/customsearch/v1?key={API_KEY}&cx={SEARCH_ENGINE_ID}&q=%22{query}%22"
-    response = requests.get(url)
-    results = response.json()
+# Read search terms from file
+with open("llama-samples-perp.txt", "r") as infile:
+    file_content = infile.read()
+    SEARCH_TERMS = ast.literal_eval(file_content)[:100]
 
-    if results.get('items'):
-        print(f"Results found for: '{query}'\n")
-        for item in results['items']:
-            print(f"Title: {item['title']}")
-            print(f"Link: {item['link']}\n")
-    else:
-        print(f"No results found for: '{query}'\n")
+total_search_terms = len(SEARCH_TERMS)
+successful_searches = 0
+
+# Open a text file named "results.txt" for saving search results
+with open("results_llama_first_100.txt", "w", encoding="utf-8") as results_file:
+    for query in SEARCH_TERMS:
+        url = f"https://www.googleapis.com/customsearch/v1?key={API_KEY}&cx={SEARCH_ENGINE_ID}&q=%22{query}%22"
+        response = requests.get(url)
+        results = response.json()
+
+        results_file.write("=============================================\n")
+
+        if results.get('items'):
+            results_file.write(f"Results found for: '{query}'\n")
+            successful_searches += 1
+            for item in results['items']:
+                results_file.write(f"Title: {item['title']}\n")
+                results_file.write(f"Link: {item['link']}\n\n")
+        else:
+            results_file.write(f"No results found for: '{query}'\n\n")
+
+    results_file.write(f"Total search terms: {total_search_terms}\n")
+    results_file.write(f"Total successful searches: {successful_searches}\n")
+    results_file.write(f"Percentage of successful searches: {100 * successful_searches / total_search_terms}%\n")
+
+print(f"Total search terms: {total_search_terms}")
+print(f"Total successful searches: {successful_searches}")
+print(f"Percentage of successful searches: {100 * successful_searches / total_search_terms}%")
