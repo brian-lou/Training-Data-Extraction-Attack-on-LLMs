@@ -1,9 +1,28 @@
 import requests
 import os
 import ast
+import numpy as np
 
 API_KEY = os.environ.get("API_KEY")
 SEARCH_ENGINE_ID = os.environ.get("SEARCH_ENGINE_ID")
+
+
+def inverse_cdf(u):
+    return int(1000 * (u**2))
+
+def sample_elements(arr, num_samples):
+    sampled_indices = set()
+    while len(sampled_indices) < num_samples:
+        u = np.random.uniform(0, 1)
+        idx = inverse_cdf(u)
+        if idx < len(arr):
+            sampled_indices.add(idx)
+    sampled_elements = [arr[i] for i in sorted(sampled_indices)]
+    return sampled_elements
+
+# print(sample_elements(sorted(np.random.rand(1000)), 100))
+
+
 
 # Read search terms from file
 with open("llama-samples-perp.txt", "r") as infile:
@@ -12,6 +31,8 @@ with open("llama-samples-perp.txt", "r") as infile:
 
 total_search_terms = len(SEARCH_TERMS)
 successful_searches = 0
+
+
 
 # Open a text file named "results.txt" for saving search results
 with open("results_llama_first_100.txt", "w", encoding="utf-8") as results_file:
