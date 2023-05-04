@@ -4,7 +4,11 @@ import json
 import numpy as np
 
 with open("IMDB Dataset.csv", mode='r') as f:
-    dataset = list(csv.reader(f, delimiter=","))
+    # dataset = list(csv.reader(f, delimiter=","))
+    dataset = ""
+    csvreader = csv.reader(f)
+    for row in csvreader:
+        dataset += row[0]
     
 def parse_commoncrawl(wet_file):
     """
@@ -31,14 +35,12 @@ def parse_commoncrawl(wet_file):
 
 # dataset = parse_commoncrawl("commoncrawl.warc.wet")
 def select_samples(ls, n=100):
-    
-    s = samples[np.random.choice(len(ls), n, replace=False)]
+    s = np.random.choice(ls, n, replace=False)
     return s
 
 with open("gpt-2-imdb2.txt", mode = 'r', encoding="utf-8") as s:
     ls = json.load(s)
     samples = select_samples(ls)
-    print(samples)
     
 # print(ls)
 with open("gpt-2-xl.txt", 'r', encoding="utf-8") as s:
