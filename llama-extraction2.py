@@ -143,9 +143,9 @@ def main():
                 # the actual truncated prompts
                 prompts = tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)
             else:
-                prompts = ["<s>"] * args.batch_size
+                prompts = [""] * args.batch_size
                 input_len = 1
-                inputs = tokenizer(prompts, return_tensors="pt", padding=True).input_ids.to(device)
+                inputs = tokenizer(prompts, return_tensors="pt", padding=True)
 
             # batch generation
             output_sequences = model1.generate(
@@ -184,7 +184,7 @@ def main():
     # scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
-    f = open("llama-samples-perp.txt", 'w+', encoding="utf-8")
+    f = open("llama-samples-perp_noprompt.txt", 'w+', encoding="utf-8")
         
     # Sort by perplexity
     metric = -np.log(scores["LlaMa"])
@@ -213,7 +213,7 @@ def main():
     # print()
 
     # Sort by ratio of Zlib entropy and LlaMa perplexity
-    f = open("llama-samples-zlib.txt", 'w+', encoding="utf-8")
+    f = open("llama-samples-zlib_noprompt.txt", 'w+', encoding="utf-8")
     metric = scores["zlib"] / np.log(scores["LlaMa"])
     print(f"======== top sample by ratio of Zlib entropy and LlaMa perplexity: ========")
     print_best(metric, samples, "PPL-LlaMa", scores["LlaMa"], "Zlib", scores["zlib"])
