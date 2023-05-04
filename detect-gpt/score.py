@@ -632,8 +632,11 @@ def generate_data(dataset, key):
     }
 
 
+# MODIFIED
 def load_base_model_and_tokenizer(name):
-    if args.openai_model is None:
+    if args.base_model_name == 'llama':
+        base_model = transformers.LlamaForCausalLM.from_pretrained('/scratch/gpfs/blou/.llamahugging', cache_dir=cache_dir).cuda()
+    elif args.openai_model is None:
         print(f'Loading BASE model {args.base_model_name}...')
         base_model_kwargs = {}
         if 'gpt-j' in name or 'neox' in name:
@@ -650,7 +653,12 @@ def load_base_model_and_tokenizer(name):
         optional_tok_kwargs['fast'] = False
     if args.dataset in ['pubmed']:
         optional_tok_kwargs['padding_side'] = 'left'
-    base_tokenizer = transformers.AutoTokenizer.from_pretrained(name, **optional_tok_kwargs, cache_dir=cache_dir)
+    if args.base_model_name == 'llama':
+        base_tokenizer = transformers.LlamaTokenizer.from_pretrained('/scratch/gpfs/blou/.llamahugging', cache_dir=cache_dir)
+        base_tokenizer.pad_token = base_tokenizer.eos_token
+        base_tokenizer.padding_side = 'left'
+    else:
+        base_tokenizer = transformers.AutoTokenizer.from_pretrained(name, **optional_tok_kwargs, cache_dir=cache_dir)
     base_tokenizer.pad_token_id = base_tokenizer.eos_token_id
 
     return base_model, base_tokenizer
