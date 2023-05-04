@@ -15,6 +15,6 @@ module purge
 module load anaconda3/2021.5
 conda activate nlp
 
-python gpt-2-imdb_extraction.py --N 20000 --batch-size 10
+python gpt-2-imdb_extraction.py --N 20000 --batch-size 10 --internet-sampling
 # python llama-extraction2.py --N 15000 --internet-sampling --wet-file commoncrawl.warc.wet 
 # python extraction.py --N 20000 --batch-size 10 --internet-sampling --wet-file commoncrawl.warc.wet 

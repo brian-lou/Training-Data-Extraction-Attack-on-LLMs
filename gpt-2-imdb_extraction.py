@@ -3,6 +3,7 @@ Generate samples with GPT-2 and filter out those that are likely to be
 memorized samples from the training set.
 """
 
+import csv
 import logging
 logging.basicConfig(level='ERROR')
 
@@ -57,29 +58,14 @@ def print_best(metric, samples, name1, scores1, name2=None, scores2=None, n=10):
         print()
 
         
-
-def parse_commoncrawl(wet_file):
-    """
-    Quick and ugly parsing of a WET file.
-    Tested for the May 2021 crawl.
-    """
-    with open(wet_file) as f:
-        lines = f.readlines() 
-    
-    start_idxs = [i for i in range(len(lines)) if "WARC/1.0" in lines[i]]
-    
-    all_eng = ""
-
-    count_eng = 0
-    for i in range(len(start_idxs)-1):
-        start = start_idxs[i]
-        end = start_idxs[i+1]
-        if "WARC-Identified-Content-Language: eng" in lines[start+7]:
-            count_eng += 1
-            for j in range(start+10, end):
-                all_eng += lines[j]
-
-    return all_eng
+def parse_IMDB():
+    with open("IMDB Dataset.csv", mode='r') as f:
+        # dataset = list(csv.reader(f, delimiter=","))
+        dataset = ""
+        csvreader = csv.reader(f)
+        for row in csvreader:
+            dataset += row[0] + "\n"
+    return dataset
 
 
 def main():
@@ -87,7 +73,8 @@ def main():
 
     if args.internet_sampling:
         print("Loading common crawl...")
-        cc = parse_commoncrawl(args.wet_file)
+        # cc = parse_commoncrawl(args.wet_file)
+        imdb = parse_IMDB()
 
     # number of tokens to generate
     seq_len = 256
@@ -125,8 +112,8 @@ def main():
 
                 while len(input_ids) < args.batch_size:
                     # take some random words in common crawl
-                    r = np.random.randint(0, len(cc))
-                    prompt = " ".join(cc[r:r+100].split(" ")[1:-1])
+                    r = np.random.randint(0, len(imdb))
+                    prompt = " ".join(imdb[r:r+100].split(" ")[1:-1])
 
                     # make sure we get the same number of tokens for each prompt to enable batching
                     inputs = tokenizer(prompt, return_tensors="pt", max_length=input_len, truncation=True)
@@ -181,7 +168,7 @@ def main():
     # scores["Lower"] = np.asarray(scores["Lower"])
     scores["zlib"] = np.asarray(scores["zlib"])
 
-    f = open("gpt-2-imdb_perp.txt", 'w+', encoding="utf-8")
+    f = open("gpt-2-imdb_perp_prompt.txt", 'w+', encoding="utf-8")
         
     # Sort by perplexity
     metric = -np.log(scores["GPT2-IMDB"])
@@ -207,7 +194,7 @@ def main():
     # print()
 
     # Sort by ratio of Zlib entropy and GPT2-IMDB perplexity
-    f = open("gpt-2-imdb_zlib.txt", 'w+', encoding="utf-8")
+    f = open("gpt-2-imdb_zlib_prompt.txt", 'w+', encoding="utf-8")
     metric = scores["zlib"] / np.log(scores["GPT2-IMDB"])
     print(f"======== top sample by ratio of Zlib entropy and GPT2-IMDB perplexity: ========")
     print_best(metric, samples, "PPL-GPT2-IMDB", scores["GPT2-IMDB"], "Zlib", scores["zlib"])
