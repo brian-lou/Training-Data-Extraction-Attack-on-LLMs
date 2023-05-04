@@ -136,7 +136,7 @@ def perturb_texts_(texts, span_length, pct, ceil_pct=False):
 
         # Handle the fact that sometimes the model doesn't generate the right number of fills and we have to try again
         attempts = 1
-        while '' in perturbed_texts:
+        while '' in perturbed_texts and attempts <= 3:
             idxs = [idx for idx, x in enumerate(perturbed_texts) if x == '']
             print(f'WARNING: {len(idxs)} texts have no fills. Trying again [attempt {attempts}].')
             masked_texts = [tokenize_and_mask(x, span_length, pct, ceil_pct) for idx, x in enumerate(texts) if idx in idxs]
@@ -146,6 +146,10 @@ def perturb_texts_(texts, span_length, pct, ceil_pct=False):
             for idx, x in zip(idxs, new_perturbed_texts):
                 perturbed_texts[idx] = x
             attempts += 1
+        if '' in perturbed_texts:
+            for i in range(len(perturbed_texts)):
+                if perturbed_texts[i] == '':
+                    perturbed_texts[i] = '<FILL>'
     else:
         if args.random_fills_tokens:
             # tokenize base_tokenizer
