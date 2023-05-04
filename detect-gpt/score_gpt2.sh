@@ -9,8 +9,8 @@ python score.py \
     --batch_size 50 \
     --output_name $results_name \
     --skip_baselines \
-    --cache_dir /home/arti/.cache \
-    --dataset_path ../gpt-2-xl.txt
+    --cache_dir /scratch/gpfs/blou/.cache \
+    --dataset_path ../gpt-2-xl_perp.txt
 
 python process.py \
     --results_path results/$results_name/perturbation_10_z_results.json \

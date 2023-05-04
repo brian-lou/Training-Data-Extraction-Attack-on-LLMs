@@ -16,4 +16,4 @@ module load anaconda3/2021.5
 conda activate nlp
 
 # python gpt-2-imdb_extraction.py --N 100000 --batch-size 10
-python llama-extraction2.py --N 20000 --internet-sampling --wet-file commoncrawl.warc.wet 
+python llama-extraction2.py --N 20000 
