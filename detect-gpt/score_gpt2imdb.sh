@@ -10,7 +10,7 @@ python score.py \
     --output_name $results_name \
     --skip_baselines \
     --cache_dir /scratch/gpfs/blou/.cache \
-    --dataset_path ../gpt-2-imdb_perp.txt
+    --dataset_path ../gpt-2-imdb_perp_prompt.txt
 
 python process.py \
     --results_path results/$results_name/perturbation_10_z_results.json \
