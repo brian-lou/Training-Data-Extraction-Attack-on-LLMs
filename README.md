@@ -1,4 +1,4 @@
-# Training data extraction from GPT-2
+# Training Data Extraction Attacks on Large Language Models: A Deeper Look into GPT-2 XL, GPT-2 IMDB, and LLaMA
 
 In this paper, we reproduce results from
 
