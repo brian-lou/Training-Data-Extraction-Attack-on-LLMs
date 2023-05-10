@@ -10,7 +10,7 @@ https://arxiv.org/abs/2012.07805
 to reproduce the Training Data Extraction Attack with several ablations. In addition, we apply the attack to the GPT-2 IMDB model, which is a version of GPT-2 that is fine tuned on a movie review dataset, and the LLaMA 7B model, which is a general 7 billion parameter LLM achieving performance on par with GPT-3. We choose these models to explore the effectiveness of the method on a model fine-tuned to a relatively small dataset, and on a state of the art model that is larger than any used in the original paper. We also develop and test a modification of their attack that makes use of DetectGPT, an approach for determining whether given text came from a particular language model, in hopes of achieving comparable performance to the original methods.
 
 **View Detection Sample Results:**
-The results of the top 100 samples and whether they achieved a hit rate can be viewed in the files with the names "analysis*[MODEL_NAME]*[SORTING_METHOD]"
+The results of the top 100 samples and whether they achieved a hit rate can be viewed in the files with the names **"analysis*[MODEL_NAME]*[SORTING_METHOD]"**
 
 This repository contains code for extracting training data from GPT-2, following the approach outlined in the following paper:
 
