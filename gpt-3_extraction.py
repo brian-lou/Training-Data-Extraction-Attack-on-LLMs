@@ -5,7 +5,7 @@ import tiktoken
 
 # Load your API key from an environment variable or secret management service
 # openai.api_key = os.getenv("OPENAI_API_KEY")
-openai.api_key = "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"
+openai.api_key = "sk-"
 gpt_model = "text-davinci-003"
 
 """

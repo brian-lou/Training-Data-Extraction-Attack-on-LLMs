@@ -5,7 +5,7 @@ import numpy as np
 
 API_KEY = os.environ.get("API_KEY")
 SEARCH_ENGINE_ID = os.environ.get("SEARCH_ENGINE_ID")
-API_KEY = "AIzaSyDTWD9wDMkNqcNVmDYhe2opu3gLC0ImG0s"
+API_KEY = ""
 SEARCH_ENGINE_ID = "a5627f229323d40e8"
 
 def inverse_cdf(u):
