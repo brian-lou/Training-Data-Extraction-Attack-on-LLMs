@@ -12,6 +12,9 @@ to reproduce the Training Data Extraction Attack with several ablations. In addi
 **View Detection Sample Results:**
 The results of the top 100 samples and whether they achieved a hit rate can be viewed in the files with the names **"analysis*[MODEL_NAME]*[SORTING_METHOD]"**
 
+
+## The following is from the original paper's README.
+
 This repository contains code for extracting training data from GPT-2, following the approach outlined in the following paper:
 
 **WARNING:**
